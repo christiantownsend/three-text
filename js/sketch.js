@@ -47,7 +47,7 @@ export default class Sketch {
 
         // Init Scene
 
-        const str       = "TEST"
+        const str       = "LET'S FUCKING GO!"
 
         const canvas = document.createElement('canvas')
         const ctx       = canvas.getContext('2d')
