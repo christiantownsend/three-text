@@ -12,34 +12,29 @@ document.querySelectorAll('.sketch').forEach(sketch => {
 
 gsap.registerPlugin(ScrollTrigger)
 
+let proxy = { skew: 0 },
+    skewSetter = gsap.quickSetter(sketches[0].uniforms.velocity, "value"), // fast
+    clamp = gsap.utils.clamp(-10, 10); // don't let the skew go beyond 20 degrees. 
+
 const tl = gsap.timeline({
     scrollTrigger: {
-        // trigger: '.sketch',
         start: 'top top',
         end: 'bottom top',
         scrub: 2,
-        // markers: true,
+        onUpdate: (self) => {
+            let skew = clamp(self.getVelocity() / -300);
+            // only do something if the skew is MORE severe. Remember, we're always tweening back to 0, so if the user slows their scrolling quickly, it's more natural to just let the tween handle that smoothly rather than jumping to the smaller skew.
+            if (Math.abs(skew) > Math.abs(proxy.skew)) {
+            proxy.skew = skew;
+            gsap.to(proxy, {skew: 0, duration: 2, ease: "power3", overwrite: true, onUpdate: () => skewSetter(proxy.skew)});
+            }
+        }
     }
 })
 
 tl.to(sketches[0].uniforms.scroll, {
     value: '+=20',
 }, 0)
-// tl.to(sketches[0].uniforms.velocity, {
-//     value: '+=1',
-// }, 0)
-
-let proxy = { skew: 0 },
-    skewSetter = gsap.quickSetter(sketches[0].uniforms.velocity, "value"), // fast
-    clamp = gsap.utils.clamp(-10, 10); // don't let the skew go beyond 20 degrees. 
-
-ScrollTrigger.create({
-    onUpdate: (self) => {
-        let skew = clamp(self.getVelocity() / -300);
-        // only do something if the skew is MORE severe. Remember, we're always tweening back to 0, so if the user slows their scrolling quickly, it's more natural to just let the tween handle that smoothly rather than jumping to the smaller skew.
-        if (Math.abs(skew) > Math.abs(proxy.skew)) {
-        proxy.skew = skew;
-        gsap.to(proxy, {skew: 0, duration: 2, ease: "power3", overwrite: true, onUpdate: () => skewSetter(proxy.skew)});
-        }
-    }
-});
+tl.to(sketches[0].box.rotation, {
+    y: '+=5',
+}, 0)

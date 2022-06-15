@@ -1,8 +1,11 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry';
 
 import vertShader from '../assets/vertex.glsl?raw'
 import fragShader from '../assets/fragment.glsl?raw'
+import refractVert from '../assets/refractVert.glsl?raw'
+import refractFrag from '../assets/refractFrag.glsl?raw'
 
 export default class Sketch {
     constructor(el) {
@@ -32,12 +35,17 @@ export default class Sketch {
         this.renderer.setClearColor(new THREE.Color(0xffffff))
         this.el.appendChild(this.renderer.domElement);
 
+        this.rtScene = new THREE.Scene()
+        this.renderTarget = new THREE.WebGLRenderTarget();
+
         // Init Camera
 
-        // this.camera = new THREE.PerspectiveCamera( 75, this.aspect, 0.1, 1000)
-        this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1)
-
-        this.camera.position.z = 5
+        this.camera = new THREE.PerspectiveCamera( 90, this.aspect, .01, 1000)
+        
+        this.rtCamera = new THREE.OrthographicCamera(-1, 1, 1, -1)
+        
+        this.camera.position.z = 2
+        this.rtCamera.position.z = 1
         
         // Init Controls
 
@@ -47,7 +55,7 @@ export default class Sketch {
 
         // Init Scene
 
-        const str       = "LET'S FUCKING GO!"
+        const str       = "REFRACT!"
 
         const canvas = document.createElement('canvas')
         const ctx       = canvas.getContext('2d')
@@ -68,15 +76,15 @@ export default class Sketch {
         ctx.fillStyle = 'black'
         ctx.fillText(str, paddingInline, canvas.height - metrics.actualBoundingBoxDescent - paddingBlock)
 
-        const texture = new THREE.Texture(canvas)
-        texture.generateMipmaps = false
-        texture.needsUpdate = true
+        const texture1 = new THREE.CanvasTexture(canvas)
+        texture1.generateMipmaps = false
+        texture1.needsUpdate = true
 
         this.uniforms = {
             ...this.uniforms,
             texture1: {
                 type: 't',
-                value: texture
+                value: texture1
             },
             tAspect: {
                 type: 'f',
@@ -103,7 +111,32 @@ export default class Sketch {
 
         const plane = new THREE.Mesh(geometry, this.material)
 
-        this.scene.add(plane)
+        this.rtScene.add(plane)
+
+        const light = new THREE.AmbientLight( 0x404040 ); // soft white light
+        this.scene.add( light );
+        
+        const geometry2 = new RoundedBoxGeometry(1, 1, 1, 1, .01)
+        this.material2 = new THREE.ShaderMaterial({
+            uniforms: {
+                envMap: {
+                    value: this.renderTarget.texture
+                },
+                resolution: {
+                    value: [this.el.clientWidth, this.el.clientHeight]
+                }
+            },
+            fragmentShader: refractFrag,
+            vertexShader: refractVert,
+            transparent: true
+        });
+        this.box = new THREE.Mesh(geometry2, this.material2)
+        this.box.rotation.z = -.5
+        this.box.position.z = 0
+
+        this.scene.add(this.box)
+
+        this.scene.background = this.renderTarget.texture
 
         // Set window size
 
@@ -118,8 +151,12 @@ export default class Sketch {
     resize() {
         this.aspect = this.el.clientWidth / this.el.clientHeight
         this.uniforms.wAspect.value = this.aspect
+        this.material2.uniforms.resolution.value = [this.el.clientWidth, this.el.clientHeight]
 
-        this.renderer.setSize(this.el.clientWidth, this.el.clientHeight);
+        this.renderer.setSize(this.el.clientWidth, this.el.clientHeight)
+        this.renderTarget.setSize(this.el.clientWidth, this.el.clientHeight)
+        this.camera.aspect = this.aspect
+        this.camera.updateProjectionMatrix()
     }
 
     update() {
@@ -127,13 +164,18 @@ export default class Sketch {
 
         // Update Loop
 
-        this.material.uniformsNeedUpdate = true
-
-        this.uniforms.time.value += .01;
+        // this.uniforms.time.value += .01
         // this.controls.update();
+
+        // this.box.rotation.y = this.uniforms.scroll.value
 
         // Render scene
 
+        
+        this.renderer.setRenderTarget(this.renderTarget)
+        this.renderer.render(this.rtScene, this.rtCamera)
+        this.renderer.setRenderTarget(null)
+        
         this.renderer.render(this.scene, this.camera)
     }
 }
